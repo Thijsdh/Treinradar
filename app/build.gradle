@@ -39,7 +39,6 @@ dependencies {
 
     compileOnly 'com.google.android.wearable:wearable:2.9.0'
     implementation 'com.google.android.support:wearable:2.9.0'
-    implementation 'com.google.android.gms:play-services-maps:18.1.0'
     implementation 'com.google.android.gms:play-services-location:21.0.1'
 
     implementation 'org.osmdroid:osmdroid-android:6.1.13'
