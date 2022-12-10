@@ -10,11 +10,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.preference.PreferenceManager
+import com.android.volley.Request
+import com.android.volley.RequestQueue
+import com.android.volley.toolbox.*
 import com.google.android.gms.location.*
+import com.google.gson.Gson
+import kotlinx.coroutines.NonCancellable.start
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.config.Configuration.*
+import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 class MainActivity : AppCompatActivity() {
 
@@ -22,11 +29,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
 
+    private lateinit var appRequestQueue: RequestQueue
+
+    private val vehicles: MutableList<Vehicle> = mutableListOf()
+
     public override fun onCreate(savedState: Bundle?) {
         super.onCreate(savedState)
-
-        // Request location permissions.
-        requestLocationPermission()
 
         // Create a FusedLocationProviderClient.
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -39,11 +47,21 @@ class MainActivity : AppCompatActivity() {
 
                 val lastLocation = locationResult.lastLocation ?: return
                 // Center the map on the new location.
-                map.controller.animateTo(org.osmdroid.util.GeoPoint(lastLocation.latitude, lastLocation.longitude))
+                map.controller.animateTo(
+                    GeoPoint(
+                        lastLocation.latitude,
+                        lastLocation.longitude
+                    )
+                )
+
+                // Request new vehicles.
+                fetchTrainLocations()
             }
         }
 
-        // Request location updates.
+        appRequestQueue = Volley.newRequestQueue(this)
+
+        requestLocationPermission()
 
         setContentView(R.layout.activity_main)
 
@@ -53,6 +71,8 @@ class MainActivity : AppCompatActivity() {
         map.controller.setZoom(15.0)
         map.zoomController.setVisibility(CustomZoomButtonsController.Visibility.SHOW_AND_FADEOUT)
         map.setTileSource(TileSourceFactory.MAPNIK)
+
+        fetchTrainLocations()
     }
 
     override fun onResume() {
@@ -66,7 +86,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestLocationPermission() {
-        if (ActivityCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
             // Permission is already granted. Start the process of requesting location updates.
             return startLocationUpdates()
         }
@@ -82,7 +106,8 @@ class MainActivity : AppCompatActivity() {
                 permissions.getOrDefault(ACCESS_COARSE_LOCATION, false) -> {
                     // Only approximate location access granted.
                     requestLocationPermission()
-                } else -> {
+                }
+                else -> {
                     // No location access granted.
                 }
             }
@@ -111,5 +136,35 @@ class MainActivity : AppCompatActivity() {
             locationCallback,
             Looper.getMainLooper()
         )
+    }
+
+    private fun fetchTrainLocations() {
+        val url = "http://10.0.2.2:3000/vehicles"
+        val request = JsonObjectRequest(
+            Request.Method.GET,
+            url,
+            null,
+            { response ->
+                run {
+                    val responseObject = Gson().fromJson(response.toString(), VehiclesResponse::class.java)
+                    Log.d(MainActivity::class.java.simpleName, responseObject.toString())
+                    vehicles.addAll(responseObject.vehicles)
+                    drawTrainLocations()
+                }
+            },
+            { error -> Log.e("Volley", error.toString()) })
+        appRequestQueue.add(request)
+    }
+
+    private fun drawTrainLocations() {
+        map.overlays.clear()
+        vehicles.forEach { vehicle ->
+            val marker = Marker(map)
+            marker.position = GeoPoint(vehicle.lat.toDouble(), vehicle.lng.toDouble())
+            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            marker.title = vehicle.ritId
+            map.overlays.add(marker)
+        }
+        map.invalidate()
     }
 }
