@@ -15,17 +15,22 @@ import com.android.volley.RequestQueue
 import com.android.volley.toolbox.*
 import com.google.android.gms.location.*
 import com.google.gson.Gson
-import kotlinx.coroutines.NonCancellable.start
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.config.Configuration.*
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var map: MapView
+    private lateinit var locationOverlay: MyLocationNewOverlay
+    private lateinit var rotationGestureOverlay: RotationGestureOverlay
+
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
 
@@ -70,7 +75,19 @@ class MainActivity : AppCompatActivity() {
         map = findViewById(R.id.map)
         map.controller.setZoom(15.0)
         map.zoomController.setVisibility(CustomZoomButtonsController.Visibility.SHOW_AND_FADEOUT)
+        map.setMultiTouchControls(true)
         map.setTileSource(TileSourceFactory.MAPNIK)
+
+        // Center the map on the Netherlands.
+        map.controller.animateTo(GeoPoint(52.5, 5.75))
+
+        locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map)
+        locationOverlay.enableMyLocation()
+        map.overlays.add(locationOverlay)
+
+        rotationGestureOverlay = RotationGestureOverlay(this, map)
+        rotationGestureOverlay.isEnabled = true
+        map.overlays.add(rotationGestureOverlay)
 
         fetchTrainLocations()
     }
@@ -139,7 +156,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun fetchTrainLocations() {
-        val url = "http://10.0.2.2:3000/vehicles"
+        val url = "${BuildConfig.API_URL}/vehicles"
         val request = JsonObjectRequest(
             Request.Method.GET,
             url,

@@ -3,6 +3,10 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def secretsFile = rootProject.file('secrets.properties')
+def secretsProperties = new Properties()
+secretsProperties.load(new FileInputStream(secretsFile))
+
 android {
     namespace 'nl.thijsdh.treinradar'
     compileSdk 33
@@ -14,6 +18,7 @@ android {
         versionCode 1
         versionName "1.0"
 
+        buildConfigField "String", "API_URL", secretsProperties.get("API_URL")
     }
 
     buildTypes {
